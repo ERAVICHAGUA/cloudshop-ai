@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  test-aws-connection:
+  build-and-push:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,3 +25,28 @@ jobs:
 
       - name: Verify AWS identity
         run: aws sts get-caller-identity
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build backend image
+        run: |
+          docker build -t cloudshop-backend:${{ github.sha }} ./backend
+          docker tag cloudshop-backend:${{ github.sha }} \
+            463984225717.dkr.ecr.us-east-1.amazonaws.com/cloudshop-backend:${{ github.sha }}
+
+      - name: Push backend image
+        run: |
+          docker push \
+            463984225717.dkr.ecr.us-east-1.amazonaws.com/cloudshop-backend:${{ github.sha }}
+
+      - name: Build frontend image
+        run: |
+          docker build -t cloudshop-frontend:${{ github.sha }} ./frontend
+          docker tag cloudshop-frontend:${{ github.sha }} \
+            463984225717.dkr.ecr.us-east-1.amazonaws.com/cloudshop-frontend:${{ github.sha }}
+
+      - name: Push frontend image
+        run: |
+          docker push \
+            463984225717.dkr.ecr.us-east-1.amazonaws.com/cloudshop-frontend:${{ github.sha }}
