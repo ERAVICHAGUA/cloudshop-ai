@@ -42,8 +42,9 @@ resource "aws_iam_role" "github_actions" {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
 
-          StringLike = {
-            "token.actions.githubusercontent.com:sub" = "repo:ERAVICHAGUA/cloudshop-ai:ref:refs/heads/main"
+          StringEquals = {
+            "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+            "token.actions.githubusercontent.com:sub" = "repo:ERAVICHAGUA@159573156/cloudshop-ai@1361645570:ref:refs/heads/main"
           }
         }
       }
