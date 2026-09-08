@@ -1,0 +1,42 @@
+# Variables de entorno / secretos
+.env
+.env.*
+backend/.env
+frontend/.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Node / React
+node_modules/
+frontend/node_modules/
+dist/
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform.lock.hcl
+
+# SSH / claves
+*.pem
+*.key
+*.ppk
+
+# IDE
+.vscode/
+.idea/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Ansible local inventory
+infra/ansible/inventory.ini

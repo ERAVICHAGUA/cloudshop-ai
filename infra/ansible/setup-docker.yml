@@ -1,0 +1,22 @@
+---
+- name: Configurar EC2 para CloudShop
+  hosts: cloudshop
+  become: true
+
+  tasks:
+    - name: Instalar Docker
+      ansible.builtin.dnf:
+        name: docker
+        state: present
+
+    - name: Habilitar e iniciar Docker
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Agregar ec2-user al grupo docker
+      ansible.builtin.user:
+        name: ec2-user
+        groups: docker
+        append: true

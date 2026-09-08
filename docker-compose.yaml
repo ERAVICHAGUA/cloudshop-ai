@@ -1,0 +1,33 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: cloudshop-backend
+    ports:
+      - "8001:8000"
+    environment:
+      DATABASE_URL: postgresql://cloudshop:cloudshop123@postgres:5432/cloudshop
+    depends_on:
+      - postgres
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: cloudshop-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+  postgres:
+    image: postgres:16
+    container_name: cloudshop-postgres
+    environment:
+      POSTGRES_USER: cloudshop
+      POSTGRES_PASSWORD: cloudshop123
+      POSTGRES_DB: cloudshop
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
