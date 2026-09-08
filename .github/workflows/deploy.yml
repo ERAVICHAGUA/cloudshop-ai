@@ -51,7 +51,7 @@ jobs:
           docker push \
             463984225717.dkr.ecr.us-east-1.amazonaws.com/cloudshop-frontend:${{ github.sha }}
         
-              - name: Deploy to EC2 with SSM
+      - name: Deploy to EC2 with SSM
         run: |
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "i-038853917277cf32a" \
