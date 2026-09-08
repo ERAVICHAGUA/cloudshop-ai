@@ -40,10 +40,6 @@ resource "aws_iam_role" "github_actions" {
         Condition = {
           StringEquals = {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
-          }
-
-          StringEquals = {
-            "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
             "token.actions.githubusercontent.com:sub" = "repo:ERAVICHAGUA@159573156/cloudshop-ai@1361645570:ref:refs/heads/main"
           }
         }
@@ -100,4 +96,43 @@ resource "aws_iam_policy" "github_actions_ecr" {
 resource "aws_iam_role_policy_attachment" "github_actions_ecr" {
   role       = aws_iam_role.github_actions.name
   policy_arn = aws_iam_policy.github_actions_ecr.arn
+}
+
+resource "aws_iam_policy" "github_actions_ssm" {
+  name        = "cloudshop-github-actions-ssm"
+  description = "Allow GitHub Actions to deploy CloudShop through SSM"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+
+    Statement = [
+      {
+        Effect = "Allow"
+
+        Action = [
+          "ssm:SendCommand"
+        ]
+
+        Resource = [
+          "arn:aws:ssm:us-east-1::document/AWS-RunShellScript",
+          aws_instance.cloudshop.arn
+        ]
+      },
+      {
+        Effect = "Allow"
+
+        Action = [
+          "ssm:GetCommandInvocation",
+          "ssm:ListCommandInvocations"
+        ]
+
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "github_actions_ssm" {
+  role       = aws_iam_role.github_actions.name
+  policy_arn = aws_iam_policy.github_actions_ssm.arn
 }
