@@ -11,22 +11,6 @@ resource "aws_security_group" "cloudshop_ec2" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  ingress {
-    description = "FastAPI"
-    from_port   = 8000
-    to_port     = 8000
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "SSH from my IP"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["138.84.39.219/32"]
-  }
-
   egress {
     description = "Allow outbound traffic"
     from_port   = 0
