@@ -16,11 +16,11 @@ frontend/node_modules/
 dist/
 
 # Terraform
-**/.terraform/
+.terraform/
 *.tfstate
 *.tfstate.*
-*.tfplan
-.terraform.lock.hcl
+*.tfvars
+*.tfvars.json
 
 # SSH / claves
 *.pem

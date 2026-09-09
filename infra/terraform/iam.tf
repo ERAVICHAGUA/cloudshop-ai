@@ -38,3 +38,35 @@ resource "aws_iam_role_policy_attachment" "ssm_ec2" {
   role       = aws_iam_role.ec2_ecr_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
+
+resource "aws_iam_policy" "ec2_parameter_store" {
+  name        = "cloudshop-ec2-parameter-store"
+  description = "Allow CloudShop EC2 to read application parameters from SSM Parameter Store"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+
+    Statement = [
+      {
+        Effect = "Allow"
+
+        Action = [
+          "ssm:GetParameter"
+        ]
+
+        Resource = aws_ssm_parameter.database_url.arn
+      }
+    ]
+  })
+
+  tags = {
+    Project     = "CloudShop"
+    Environment = "dev"
+    ManagedBy   = "Terraform"
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "ec2_parameter_store" {
+  role       = aws_iam_role.ec2_ecr_role.name
+  policy_arn = aws_iam_policy.ec2_parameter_store.arn
+}
