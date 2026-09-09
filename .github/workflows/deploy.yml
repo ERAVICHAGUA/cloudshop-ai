@@ -64,8 +64,8 @@ jobs:
               "docker rm -f cloudshop-backend || true",
               "docker rm -f cloudshop-frontend || true",
               "DATABASE_URL=$(aws ssm get-parameter --name /cloudshop/dev/database_url --with-decryption --region us-east-1 --query Parameter.Value --output text)",
-              "docker run -d --name cloudshop-backend --network cloudshop-network -p 8000:8000 -e DATABASE_URL=\"$DATABASE_URL\" 463984225717.dkr.ecr.us-east-1.amazonaws.com/cloudshop-backend:${{ github.sha }}",
-              "docker run -d --name cloudshop-frontend --network cloudshop-network -p 80:80 463984225717.dkr.ecr.us-east-1.amazonaws.com/cloudshop-frontend:${{ github.sha }}"
+              "docker run -d --name cloudshop-backend --network cloudshop-network -p 8000:8000 -e DATABASE_URL=\"$DATABASE_URL\" --log-driver=awslogs --log-opt awslogs-region=us-east-1 --log-opt awslogs-group=/cloudshop/backend --log-opt awslogs-stream=cloudshop-backend 463984225717.dkr.ecr.us-east-1.amazonaws.com/cloudshop-backend:${{ github.sha }}",
+              "docker run -d --name cloudshop-frontend --network cloudshop-network -p 80:80 --log-driver=awslogs --log-opt awslogs-region=us-east-1 --log-opt awslogs-group=/cloudshop/frontend --log-opt awslogs-stream=cloudshop-frontend 463984225717.dkr.ecr.us-east-1.amazonaws.com/cloudshop-frontend:${{ github.sha }}"
             ]' \
             --query "Command.CommandId" \
             --output text)

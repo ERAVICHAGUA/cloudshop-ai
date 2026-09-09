@@ -70,3 +70,8 @@ resource "aws_iam_role_policy_attachment" "ec2_parameter_store" {
   role       = aws_iam_role.ec2_ecr_role.name
   policy_arn = aws_iam_policy.ec2_parameter_store.arn
 }
+
+resource "aws_iam_role_policy_attachment" "cloudwatch_agent" {
+  role       = aws_iam_role.ec2_ecr_role.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
