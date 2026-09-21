@@ -3,7 +3,7 @@ resource "aws_ssm_parameter" "database_url" {
   description = "Database connection URL for CloudShop backend"
   type        = "SecureString"
 
-value = var.database_url
+  value = var.database_url
 
   tags = {
     Project     = "CloudShop"

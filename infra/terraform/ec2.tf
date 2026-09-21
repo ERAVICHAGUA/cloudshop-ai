@@ -9,7 +9,7 @@ data "aws_ami" "amazon_linux" {
 }
 
 resource "aws_instance" "cloudshop" {
-  ami                    = data.aws_ami.amazon_linux.id
+  ami                    = "ami-007dd4cdc89d5d91d"
   instance_type          = "t3.micro"
   subnet_id              = aws_subnet.public_a.id
   vpc_security_group_ids = [aws_security_group.cloudshop_ec2.id]
