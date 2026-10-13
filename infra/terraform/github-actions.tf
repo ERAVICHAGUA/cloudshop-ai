@@ -136,3 +136,43 @@ resource "aws_iam_role_policy_attachment" "github_actions_ssm" {
   role       = aws_iam_role.github_actions.name
   policy_arn = aws_iam_policy.github_actions_ssm.arn
 }
+
+resource "aws_iam_policy" "github_actions_s3_deploy" {
+  name        = "cloudshop-github-actions-s3-deploy"
+  description = "Allow GitHub Actions to upload CloudShop deployment configuration to S3"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+
+    Statement = [
+      {
+        Effect = "Allow"
+
+        Action = [
+          "s3:PutObject"
+        ]
+
+        Resource = [
+          "arn:aws:s3:::cloudshop-deploy-config/*"
+        ]
+      },
+      {
+        Effect = "Allow"
+
+        Action = [
+          "s3:ListBucket"
+        ]
+
+        Resource = [
+          "arn:aws:s3:::cloudshop-deploy-config"
+        ]
+      }
+    ]
+  })
+}
+
+
+resource "aws_iam_role_policy_attachment" "github_actions_s3_deploy" {
+  role       = aws_iam_role.github_actions.name
+  policy_arn = aws_iam_policy.github_actions_s3_deploy.arn
+}
