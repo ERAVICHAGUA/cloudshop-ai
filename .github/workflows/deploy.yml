@@ -101,7 +101,8 @@ jobs:
               "cd /home/ec2-user/cloudshop-production",
 
               "docker compose -f docker-compose.prod.yml down || true",
-
+               
+               docker system prune -af 
               "docker compose -f docker-compose.prod.yml pull",
 
               "docker compose -f docker-compose.prod.yml up -d"
