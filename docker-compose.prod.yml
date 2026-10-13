@@ -1,0 +1,105 @@
+services:
+
+  backend:
+    image: 463984225717.dkr.ecr.us-east-1.amazonaws.com/cloudshop-backend:${TAG}
+    container_name: cloudshop-backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    networks:
+      - cloudshop-network
+    restart: always
+
+  frontend:
+    image: 463984225717.dkr.ecr.us-east-1.amazonaws.com/cloudshop-frontend:${TAG}
+    container_name: cloudshop-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - cloudshop-network
+    restart: always
+
+  postgres:
+    image: postgres:16
+    container_name: cloudshop-postgres
+    environment:
+      POSTGRES_USER: cloudshop
+      POSTGRES_PASSWORD: cloudshop123
+      POSTGRES_DB: cloudshop
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - cloudshop-network
+    restart: always
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: cloudshop-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - backend
+    networks:
+      - cloudshop-network
+    restart: always
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: cloudshop-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - cloudshop-network
+    restart: always
+
+  loki:
+    image: grafana/loki:3.5.9
+    container_name: cloudshop-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./infra/monitoring/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    networks:
+      - cloudshop-network
+    restart: always
+
+  alloy:
+    image: grafana/alloy:v1.10.2
+    container_name: cloudshop-alloy
+    command:
+      - run
+      - /etc/alloy/config.alloy
+    volumes:
+      - ./infra/monitoring/alloy-config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - alloy_data:/var/lib/alloy/data
+    depends_on:
+      - loki
+    networks:
+      - cloudshop-network
+    restart: always
+
+
+volumes:
+  postgres_data:
+  prometheus_data:
+  grafana_data:
+  loki_data:
+  alloy_data:
+
+
+networks:
+  cloudshop-network:
+    name: cloudshop-network
+    external: true

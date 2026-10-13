@@ -51,6 +51,26 @@ jobs:
           docker push \
             463984225717.dkr.ecr.us-east-1.amazonaws.com/cloudshop-frontend:${{ github.sha }}
 
+      - name: Prepare production files on EC2
+        run: |
+          COMPOSE_CONTENT=$(base64 -w 0 docker-compose.prod.yml)
+          ALLOY_CONTENT=$(base64 -w 0 infra/monitoring/alloy-config.alloy)
+          LOKI_CONTENT=$(base64 -w 0 infra/monitoring/loki-config.yml)
+          PROM_CONTENT=$(base64 -w 0 infra/monitoring/prometheus.yml)
+
+          aws ssm send-command \
+            --instance-ids "i-038853917277cf32a" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Upload CloudShop production configuration" \
+            --parameters "commands=[
+              \"mkdir -p /home/ec2-user/infra/monitoring\",
+              \"echo $COMPOSE_CONTENT | base64 -d > /home/ec2-user/docker-compose.prod.yml\",
+              \"echo $ALLOY_CONTENT | base64 -d > /home/ec2-user/infra/monitoring/alloy-config.alloy\",
+              \"echo $LOKI_CONTENT | base64 -d > /home/ec2-user/infra/monitoring/loki-config.yml\",
+              \"echo $PROM_CONTENT | base64 -d > /home/ec2-user/infra/monitoring/prometheus.yml\",
+              \"chown -R ec2-user:ec2-user /home/ec2-user/infra\"
+            ]"
+
       - name: Deploy to EC2 with SSM
         run: |
           COMMAND_ID=$(aws ssm send-command \
@@ -59,13 +79,16 @@ jobs:
             --comment "Deploy CloudShop commit ${{ github.sha }}" \
             --parameters 'commands=[
               "aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 463984225717.dkr.ecr.us-east-1.amazonaws.com",
-              "docker pull 463984225717.dkr.ecr.us-east-1.amazonaws.com/cloudshop-backend:${{ github.sha }}",
-              "docker pull 463984225717.dkr.ecr.us-east-1.amazonaws.com/cloudshop-frontend:${{ github.sha }}",
-              "docker rm -f cloudshop-backend || true",
-              "docker rm -f cloudshop-frontend || true",
-              "DATABASE_URL=$(aws ssm get-parameter --name /cloudshop/dev/database_url --with-decryption --region us-east-1 --query Parameter.Value --output text)",
-              "docker run -d --name cloudshop-backend --network cloudshop-network -p 8000:8000 -e DATABASE_URL=\"$DATABASE_URL\" --log-driver=awslogs --log-opt awslogs-region=us-east-1 --log-opt awslogs-group=/cloudshop/backend --log-opt awslogs-stream=cloudshop-backend 463984225717.dkr.ecr.us-east-1.amazonaws.com/cloudshop-backend:${{ github.sha }}",
-              "docker run -d --name cloudshop-frontend --network cloudshop-network -p 80:80 --log-driver=awslogs --log-opt awslogs-region=us-east-1 --log-opt awslogs-group=/cloudshop/frontend --log-opt awslogs-stream=cloudshop-frontend 463984225717.dkr.ecr.us-east-1.amazonaws.com/cloudshop-frontend:${{ github.sha }}"
+
+              "export TAG=${{ github.sha }}",
+
+              "export DATABASE_URL=$(aws ssm get-parameter --name /cloudshop/dev/database_url --with-decryption --region us-east-1 --query Parameter.Value --output text)",
+
+              "docker compose -f /home/ec2-user/docker-compose.prod.yml down || true",
+
+              "docker compose -f /home/ec2-user/docker-compose.prod.yml pull",
+
+              "docker compose -f /home/ec2-user/docker-compose.prod.yml up -d"
             ]' \
             --query "Command.CommandId" \
             --output text)
