@@ -15,8 +15,8 @@ services:
     image: 463984225717.dkr.ecr.us-east-1.amazonaws.com/cloudshop-frontend:${TAG}
     container_name: cloudshop-frontend
     ports:
-      - "80:80"
     depends_on:
+      - "80:80"
       - backend
     networks:
       - cloudshop-network
