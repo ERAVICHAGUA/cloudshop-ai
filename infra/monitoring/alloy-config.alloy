@@ -1,0 +1,32 @@
+
+discovery.docker "cloudshop" {
+  host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "cloudshop_backend" {
+  targets = discovery.docker.cloudshop.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/cloudshop-backend"
+    action        = "keep"
+  }
+
+  rule {
+    target_label = "job"
+    replacement  = "cloudshop-backend"
+  }
+}
+
+loki.source.docker "backend" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.cloudshop_backend.output
+  forward_to = [loki.write.cloudshop.receiver]
+}
+
+loki.write "cloudshop" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+    

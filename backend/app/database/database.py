@@ -8,6 +8,12 @@ DATABASE_URL = os.getenv(
     "postgresql://cloudshop:cloudshop123@localhost:5433/cloudshop"
 )
 
+DATABASE_URL = DATABASE_URL.replace(
+    "postgresql://",
+    "postgresql+psycopg2://",
+    1
+)
+
 engine = create_engine(DATABASE_URL)
 
 SessionLocal = sessionmaker(
