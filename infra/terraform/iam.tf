@@ -71,6 +71,28 @@ resource "aws_iam_role_policy_attachment" "ec2_parameter_store" {
   policy_arn = aws_iam_policy.ec2_parameter_store.arn
 }
 
+resource "aws_iam_role_policy_attachment" "ec2_s3_deploy" {
+  role       = aws_iam_role.ec2_ecr_role.name
+  policy_arn = aws_iam_policy.ec2_s3_deploy.arn
+}
+
+resource "aws_iam_policy" "ec2_s3_deploy" {
+  name = "cloudshop-ec2-s3-deploy"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject"
+        ]
+        Resource = "arn:aws:s3:::cloudshop-deploy-config/*"
+      }
+    ]
+  })
+}
+
 resource "aws_iam_role_policy_attachment" "cloudwatch_agent" {
   role       = aws_iam_role.ec2_ecr_role.name
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
