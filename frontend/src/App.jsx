@@ -23,9 +23,39 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
-  const [cart, setCart] = useState([]);
+  const [priceFilter, setPriceFilter] = useState("all");
+
+  const [cart, setCart] = useState(() => {
+    try {
+      const savedCart = localStorage.getItem("cloudshop-cart");
+      const parsed = savedCart ? JSON.parse(savedCart) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
   const [showCart, setShowCart] = useState(false);
 
+    function removeFromCart(id) {
+    setCart((current) => current.filter((item) => item.id !== id));
+  }
+
+  function updateQuantity(id, change) {
+    setCart((current) =>
+      current
+        .map((item) => {
+          if (item.id !== id) return item;
+
+          const quantity = Math.max(
+            0,
+            Math.min(item.quantity + change, Number(item.stock))
+          );
+
+          return { ...item, quantity };
+        })
+        .filter((item) => item.quantity > 0)
+    );
+  }
   useEffect(() => {
     async function loadProducts() {
       try {
@@ -41,15 +71,30 @@ function App() {
     loadProducts();
   }, []);
 
+  
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
-      const term = search.toLowerCase();
-      return (
+      const term = search.toLowerCase().trim();
+      const price = Number(product.price);
+
+      const matchesSearch =
         product.name.toLowerCase().includes(term) ||
-        (product.description || "").toLowerCase().includes(term)
-      );
+        (product.description || "").toLowerCase().includes(term);
+
+      let matchesPrice = true;
+
+      if (priceFilter === "low") {
+        matchesPrice = price < 100;
+      } else if (priceFilter === "medium") {
+        matchesPrice = price >= 100 && price <= 500;
+      } else if (priceFilter === "high") {
+        matchesPrice = price > 500;
+      }
+
+      return matchesSearch && matchesPrice;
     });
-  }, [products, search]);
+  }, [products, search, priceFilter]);
+
 
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
 
@@ -182,6 +227,38 @@ function App() {
             />
           </div>
 
+          
+          <div className="price-filters">
+            <button
+              className={priceFilter === "all" ? "active" : ""}
+              onClick={() => setPriceFilter("all")}
+            >
+              Todos
+            </button>
+
+            <button
+              className={priceFilter === "low" ? "active" : ""}
+              onClick={() => setPriceFilter("low")}
+            >
+              Menos de S/ 100
+            </button>
+
+            <button
+              className={priceFilter === "medium" ? "active" : ""}
+              onClick={() => setPriceFilter("medium")}
+            >
+              S/ 100 - S/ 500
+            </button>
+
+            <button
+              className={priceFilter === "high" ? "active" : ""}
+              onClick={() => setPriceFilter("high")}
+            >
+              Más de S/ 500
+            </button>
+          </div>
+
+
           {loading && <p className="state-message">Cargando productos...</p>}
 
           {error && (
@@ -299,17 +376,46 @@ function App() {
                 <p>Tu carrito está vacío.</p>
               ) : (
                 cart.map((item) => (
+                  
                   <div className="cart-item" key={item.id}>
-                    <div>
+                    <div className="cart-item-info">
                       <strong>{item.name}</strong>
-                      <p>
-                        {item.quantity} × {formatPrice(item.price)}
-                      </p>
+                      <p>{formatPrice(item.price)} por unidad</p>
+
+                      <div className="quantity-controls">
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(item.id, -1)}
+                          aria-label={`Disminuir cantidad de ${item.name}`}
+                        >
+                          −
+                        </button>
+
+                        <span>{item.quantity}</span>
+
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(item.id, 1)}
+                          disabled={item.quantity >= Number(item.stock)}
+                          aria-label={`Aumentar cantidad de ${item.name}`}
+                        >
+                          +
+                        </button>
+                      </div>
                     </div>
-                    <button onClick={() => removeFromCart(item.id)}>
-                      Eliminar
-                    </button>
+
+                    <div className="cart-item-actions">
+                      <strong>{formatPrice(Number(item.price) * item.quantity)}</strong>
+
+                      <button
+                        type="button"
+                        onClick={() => removeFromCart(item.id)}
+                      >
+                        Eliminar
+                      </button>
+                    </div>
                   </div>
+
                 ))
               )}
             </div>
