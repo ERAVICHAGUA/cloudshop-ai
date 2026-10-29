@@ -1,15 +1,17 @@
-services:
+﻿services:
+
 
   backend:
     image: 463984225717.dkr.ecr.us-east-1.amazonaws.com/cloudshop-backend:${TAG}
     container_name: cloudshop-backend
     ports:
-      - "8000:8000"
+      - "8001:8000"
     environment:
       DATABASE_URL: ${DATABASE_URL}
     networks:
       - cloudshop-network
     restart: always
+
 
   frontend:
     image: 463984225717.dkr.ecr.us-east-1.amazonaws.com/cloudshop-frontend:${TAG}

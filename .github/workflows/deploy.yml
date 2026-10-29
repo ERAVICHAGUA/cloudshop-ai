@@ -1,23 +1,35 @@
+
 name: CloudShop CI/CD
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   id-token: write
   contents: read
 
+concurrency:
+  group: cloudshop-production
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  AWS_ACCOUNT_ID: "463984225717"
+  INSTANCE_ID: i-038853917277cf32a
+  S3_BUCKET: cloudshop-deploy-config
+  COMPOSE_PROJECT: cloudshop-production
+
 jobs:
-  build-and-push:
+  build-and-deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v4
-
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -25,137 +37,270 @@ jobs:
           role-to-assume: arn:aws:iam::463984225717:role/cloudshop-github-actions-role
           aws-region: us-east-1
 
-
       - name: Verify AWS identity
         run: aws sts get-caller-identity
-
 
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-
-      - name: Build backend image
+      # BACKEND
+      - name: Build and push backend
+        shell: bash
         run: |
-          docker build -t cloudshop-backend:${{ github.sha }} ./backend
+          set -euo pipefail
 
-          docker tag cloudshop-backend:${{ github.sha }} \
-            463984225717.dkr.ecr.us-east-1.amazonaws.com/cloudshop-backend:${{ github.sha }}
+          REPO="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/cloudshop-backend"
+          TAG="${{ github.sha }}"
 
+          docker build -t "$REPO:$TAG" ./backend
+          docker push "$REPO:$TAG"
 
-      - name: Push backend image
+      # FRONTEND
+      - name: Build and push frontend
+        shell: bash
         run: |
-          docker push \
-            463984225717.dkr.ecr.us-east-1.amazonaws.com/cloudshop-backend:${{ github.sha }}
+          set -euo pipefail
 
+          REPO="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/cloudshop-frontend"
+          TAG="${{ github.sha }}"
 
-      - name: Build frontend image
+          docker build -t "$REPO:$TAG" ./frontend
+          docker push "$REPO:$TAG"
+
+      # SCRIPT REMOTO
+      - name: Prepare deployment script
+        shell: bash
         run: |
-          docker build -t cloudshop-frontend:${{ github.sha }} ./frontend
+          cat > deploy-remote.sh <<'SCRIPT'
+          #!/usr/bin/env bash
+          set -euo pipefail
 
-          docker tag cloudshop-frontend:${{ github.sha }} \
-            463984225717.dkr.ecr.us-east-1.amazonaws.com/cloudshop-frontend:${{ github.sha }}
+          TAG="$1"
+          REGION="us-east-1"
+          ACCOUNT="463984225717"
+          DIR="$2"
+          PROJECT="cloudshop-production"
 
+          cd "$DIR"
+          export TAG
 
-      - name: Push frontend image
+          echo "Deploying CloudShop release: $TAG"
+
+          DATABASE_URL=$(aws ssm get-parameter \
+            --name /cloudshop/dev/database_url \
+            --with-decryption \
+            --region "$REGION" \
+            --query Parameter.Value \
+            --output text)
+
+          test -n "$DATABASE_URL"
+          test "$DATABASE_URL" != "None"
+          export DATABASE_URL
+
+          echo "Checking existing PostgreSQL"
+
+          test "$(docker inspect -f '{{.State.Running}}' cloudshop-postgres)" = "true"
+
+          echo "Checking Docker network"
+
+          docker network inspect cloudshop-network >/dev/null
+
+          echo "Logging into Amazon ECR"
+
+          aws ecr get-login-password --region "$REGION" \
+            | docker login \
+                --username AWS \
+                --password-stdin \
+                "$ACCOUNT.dkr.ecr.$REGION.amazonaws.com"
+
+          echo "Validating Compose"
+
+          docker compose \
+            -p "$PROJECT" \
+            -f docker-compose.prod.yml \
+            config --quiet
+
+          echo "Downloading backend and frontend images"
+
+          docker compose \
+            -p "$PROJECT" \
+            -f docker-compose.prod.yml \
+            pull backend frontend
+
+          echo "Updating application containers only"
+
+          docker compose \
+            -p "$PROJECT" \
+            -f docker-compose.prod.yml \
+            up -d --no-deps backend frontend
+
+          echo "Verifying FastAPI"
+
+          BACKEND_OK=0
+
+          for i in $(seq 1 20); do
+            if curl -fsS --max-time 5 \
+              http://127.0.0.1:8001/health >/dev/null; then
+              BACKEND_OK=1
+              break
+            fi
+            sleep 3
+          done
+
+          test "$BACKEND_OK" -eq 1
+
+          echo "Verifying frontend"
+
+          FRONTEND_OK=0
+
+          for i in $(seq 1 20); do
+            if curl -fsS --max-time 5 \
+              http://127.0.0.1/ >/dev/null; then
+              FRONTEND_OK=1
+              break
+            fi
+            sleep 3
+          done
+
+          test "$FRONTEND_OK" -eq 1
+
+          echo "Verifying product API"
+
+          PRODUCTS_OK=0
+
+          for i in $(seq 1 20); do
+            if curl -fsS --max-time 5 \
+              http://127.0.0.1/api/products/ >/dev/null; then
+              PRODUCTS_OK=1
+              break
+            fi
+            sleep 3
+          done
+
+          test "$PRODUCTS_OK" -eq 1
+
+          echo "Verifying PostgreSQL remains running"
+
+          test "$(docker inspect -f '{{.State.Running}}' cloudshop-postgres)" = "true"
+
+          echo "Deployment status"
+
+          docker ps --filter name=cloudshop-backend
+          docker ps --filter name=cloudshop-frontend
+
+          echo "CLOUDSHOP_DEPLOY_SUCCESS"
+          SCRIPT
+
+          chmod 755 deploy-remote.sh
+
+      # EMPAQUETADO
+      - name: Package configuration
+        shell: bash
         run: |
-          docker push \
-            463984225717.dkr.ecr.us-east-1.amazonaws.com/cloudshop-frontend:${{ github.sha }}
+          set -euo pipefail
 
-
-      - name: Package production configuration
-        run: |
           tar -czf cloudshop-production.tar.gz \
             docker-compose.prod.yml \
-            infra/monitoring
+            infra/monitoring \
+            deploy-remote.sh
 
-
-      - name: Upload configuration to S3
+      - name: Upload release to S3
+        shell: bash
         run: |
+          set -euo pipefail
+
           aws s3 cp cloudshop-production.tar.gz \
-            s3://cloudshop-deploy-config/cloudshop-production.tar.gz
+            "s3://$S3_BUCKET/releases/${{ github.sha }}.tar.gz"
 
-
-      - name: Deploy to EC2 with SSM
+      # DESPLIEGUE SSM
+      - name: Deploy to EC2 via SSM
+        shell: bash
         run: |
+          set -euo pipefail
+
+          export RELEASE_SHA="${{ github.sha }}"
+
+          python3 - <<'PY'
+          import json
+          import os
+
+          sha = os.environ["RELEASE_SHA"]
+          bucket = os.environ["S3_BUCKET"]
+
+          release_dir = f"/opt/cloudshop-deploy/releases/{sha}"
+          archive = f"/opt/cloudshop-deploy/{sha}.tar.gz"
+
+          script = f"""
+          set -euo pipefail
+          mkdir -p /opt/cloudshop-deploy/releases
+          mkdir -p {release_dir}
+          aws s3 cp s3://{bucket}/releases/{sha}.tar.gz {archive}
+          tar -xzf {archive} -C {release_dir}
+          bash {release_dir}/deploy-remote.sh {sha} {release_dir}
+          """
+
+          with open("ssm-params.json", "w") as f:
+              json.dump({
+                  "commands": ["bash -c " + __import__("shlex").quote(script)]
+              }, f)
+          PY
 
           COMMAND_ID=$(aws ssm send-command \
-            --instance-ids "i-038853917277cf32a" \
-            --document-name "AWS-RunShellScript" \
-            --comment "Deploy CloudShop commit ${{ github.sha }}" \
-            --parameters 'commands=[
-
-              "aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 463984225717.dkr.ecr.us-east-1.amazonaws.com",
-
-              "rm -rf /home/ec2-user/cloudshop-production",
-
-              "mkdir -p /home/ec2-user/cloudshop-production",
-
-              "aws s3 cp s3://cloudshop-deploy-config/cloudshop-production.tar.gz /home/ec2-user/cloudshop-production/",
-
-              "tar -xzf /home/ec2-user/cloudshop-production/cloudshop-production.tar.gz -C /home/ec2-user/cloudshop-production",
-
-              "export TAG=${{ github.sha }}",
-
-              "export DATABASE_URL=$(aws ssm get-parameter --name /cloudshop/dev/database_url --with-decryption --region us-east-1 --query Parameter.Value --output text)",
-
-              "cd /home/ec2-user/cloudshop-production",
-
-              "docker compose -f docker-compose.prod.yml down || true",
-               
-              "docker system prune -af", 
-               
-              "docker compose -f docker-compose.prod.yml pull",
-
-              "docker compose -f docker-compose.prod.yml up -d"
-
-            ]' \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "CloudShop release $RELEASE_SHA" \
+            --parameters file://ssm-params.json \
+            --region "$AWS_REGION" \
             --query "Command.CommandId" \
             --output text)
 
+          test -n "$COMMAND_ID"
+          test "$COMMAND_ID" != "None"
 
-          echo "Command ID: $COMMAND_ID"
+          echo "SSM Command ID: $COMMAND_ID"
 
+          SUCCESS=0
 
-          echo "Waiting for SSM execution..."
-
-
-          for i in {1..60}
-          do
+          for _ in $(seq 1 90); do
 
             STATUS=$(aws ssm get-command-invocation \
               --command-id "$COMMAND_ID" \
-              --instance-id "i-038853917277cf32a" \
-              --query "Status" \
-              --output text)
+              --instance-id "$INSTANCE_ID" \
+              --region "$AWS_REGION" \
+              --query Status \
+              --output text 2>/dev/null) || STATUS="Pending"
 
-
-            echo "Current SSM status: $STATUS"
-
+            echo "SSM status: $STATUS"
 
             if [ "$STATUS" = "Success" ]; then
-              echo "Deployment completed successfully"
+              SUCCESS=1
               break
             fi
 
+            case "$STATUS" in
+              Failed|Cancelled|Cancelling|TimedOut|DeliveryTimedOut|Undeliverable|Terminated)
+                echo "Deployment failed"
 
-            if [ "$STATUS" = "Failed" ]; then
+                aws ssm get-command-invocation \
+                  --command-id "$COMMAND_ID" \
+                  --instance-id "$INSTANCE_ID" \
+                  --region "$AWS_REGION" || true
 
-              echo "Deployment failed"
-
-              aws ssm get-command-invocation \
-                --command-id "$COMMAND_ID" \
-                --instance-id "i-038853917277cf32a"
-
-              exit 1
-
-            fi
-
+                exit 1
+                ;;
+            esac
 
             sleep 10
-
           done
 
+          if [ "$SUCCESS" -ne 1 ]; then
+            echo "Deployment timed out"
+            exit 1
+          fi
 
           aws ssm get-command-invocation \
             --command-id "$COMMAND_ID" \
-            --instance-id "i-038853917277cf32a"
+            --instance-id "$INSTANCE_ID" \
+            --region "$AWS_REGION"
+
+          echo "CloudShop deployment completed"

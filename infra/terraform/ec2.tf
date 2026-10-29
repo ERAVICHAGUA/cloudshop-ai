@@ -1,3 +1,4 @@
+
 data "aws_ami" "amazon_linux" {
   most_recent = true
   owners      = ["amazon"]
@@ -18,6 +19,11 @@ resource "aws_instance" "cloudshop" {
   key_name             = aws_key_pair.cloudshop.key_name
 
   associate_public_ip_address = true
+
+  root_block_device {
+    volume_size = 30
+    volume_type = "gp3"
+  }
 
   tags = {
     Name        = "cloudshop-ec2"
