@@ -17,6 +17,18 @@ const productImages = {
   "Parlante Bluetooth Sony": "/products/parlante-sony.jpg",
 };
 
+const productCategories = {
+  "Laptop Lenovo IdeaPad": "Laptops",
+  "Mouse Logitech M185": "Periféricos",
+  "Teclado Redragon Kumara": "Periféricos",
+  "Monitor Samsung 24": "Monitores",
+  "Audifonos JBL Tune 520BT": "Audio",
+  "SSD Kingston 1TB": "Almacenamiento",
+  "Webcam Logitech C920": "Periféricos",
+  "Mouse Pad XL": "Accesorios",
+  "Hub USB-C 6 en 1": "Accesorios",
+  "Parlante Bluetooth Sony": "Audio",
+};
 
 function App() {
   const [products, setProducts] = useState([]);
@@ -24,6 +36,7 @@ function App() {
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
   const [priceFilter, setPriceFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("Todas");
 
   const [cart, setCart] = useState(() => {
     try {
@@ -72,7 +85,6 @@ function App() {
     loadProducts();
   }, []);
 
-  
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
       const term = search.toLowerCase().trim();
@@ -92,10 +104,13 @@ function App() {
         matchesPrice = price > 500;
       }
 
-      return matchesSearch && matchesPrice;
-    });
-  }, [products, search, priceFilter]);
+      const matchesCategory =
+        categoryFilter === "Todas" ||
+        productCategories[product.name] === categoryFilter;
 
+      return matchesSearch && matchesPrice && matchesCategory;
+    });
+  }, [products, search, priceFilter, categoryFilter]);
 
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
 
@@ -229,6 +244,27 @@ function App() {
           </div>
 
           
+          <div className="category-filters">
+            {[
+              "Todas",
+              "Laptops",
+              "Periféricos",
+              "Monitores",
+              "Audio",
+              "Almacenamiento",
+              "Accesorios",
+            ].map((category) => (
+              <button
+                key={category}
+                type="button"
+                className={categoryFilter === category ? "active" : ""}
+                onClick={() => setCategoryFilter(category)}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+
           <div className="price-filters">
             <button
               className={priceFilter === "all" ? "active" : ""}

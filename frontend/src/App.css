@@ -859,3 +859,35 @@
     max-height: 220px;
   }
 }
+
+
+/* Filtros por categoría */
+
+.category-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.category-filters button {
+  padding: 11px 17px;
+  border: 1px solid #e2e6ef;
+  border-radius: 9px;
+  background: white;
+  color: #536078;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.category-filters button:hover {
+  border-color: #635bff;
+  color: #635bff;
+}
+
+.category-filters button.active {
+  background: #635bff;
+  border-color: #635bff;
+  color: white;
+}
