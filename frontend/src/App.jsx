@@ -35,6 +35,7 @@ function App() {
     }
   });
   const [showCart, setShowCart] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
 
     function removeFromCart(id) {
     setCart((current) => current.filter((item) => item.id !== id));
@@ -282,7 +283,10 @@ function App() {
                   inCart && inCart.quantity >= Number(product.stock);
 
                 return (
-                  <article className="product-card" key={product.id}>
+                  <article
+                    className="product-card"
+                    key={product.id}
+                  >
                     
                     <div className="product-image">
                       {productImages[product.name] ? (
@@ -298,8 +302,15 @@ function App() {
 
                       <span className="product-label">TECH</span>
                     </div>
-
-
+                    
+                    <button
+                      type="button"
+                      className="product-view-button"
+                      onClick={() => setSelectedProduct(product)}
+                    >
+                      Ver detalles
+                    </button>  
+                      
                     <div className="product-details">
                       <span className="product-category">Tecnología</span>
                       <h3>{product.name}</h3>
@@ -353,6 +364,78 @@ function App() {
         <span>© {new Date().getFullYear()} CloudShop AI.</span>
         <span>Construido con React, FastAPI y AWS.</span>
       </footer>
+
+      
+      {selectedProduct && (
+        <div
+          className="product-modal-overlay"
+          onClick={() => setSelectedProduct(null)}
+        >
+          <div
+            className="product-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Detalles de ${selectedProduct.name}`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="product-modal-close"
+              onClick={() => setSelectedProduct(null)}
+              aria-label="Cerrar detalles"
+            >
+              ✕
+            </button>
+
+            <div className="product-modal-image">
+              {productImages[selectedProduct.name] ? (
+                <img
+                  src={productImages[selectedProduct.name]}
+                  alt={selectedProduct.name}
+                />
+              ) : (
+                <span className="product-placeholder">⌘</span>
+              )}
+            </div>
+
+            <div className="product-modal-info">
+              <span className="eyebrow">CLOUDSHOP AI · TECNOLOGÍA</span>
+
+              <h2>{selectedProduct.name}</h2>
+
+              <p>{selectedProduct.description}</p>
+
+              <strong className="product-modal-price">
+                {formatPrice(selectedProduct.price)}
+              </strong>
+
+              <p>
+                {selectedProduct.stock > 0
+                  ? `${selectedProduct.stock} unidades disponibles`
+                  : "Producto agotado"}
+              </p>
+
+              <button
+                type="button"
+                className="primary-button"
+                disabled={
+                  Number(selectedProduct.stock) <= 0 ||
+                  cart.find((item) => item.id === selectedProduct.id)
+                    ?.quantity >= Number(selectedProduct.stock)
+                }
+                onClick={() => {
+                  addToCart(selectedProduct);
+                  setSelectedProduct(null);
+                  setShowCart(true);
+                }}
+              >
+                Agregar al carrito +
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {showCart && (
         <div className="cart-overlay" onClick={() => setShowCart(false)}>
